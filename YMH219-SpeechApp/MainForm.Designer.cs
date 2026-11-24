@@ -279,6 +279,7 @@ namespace SpeechApp
             this.rtbTtsText.ForeColor = System.Drawing.Color.FromArgb(30, 41, 59);
             this.rtbTtsText.Location = new System.Drawing.Point(14, 12);
             this.rtbTtsText.Name = "rtbTtsText";
+            this.rtbTtsText.TextChanged += new System.EventHandler(this.RtbTtsText_TextChanged);
             this.rtbTtsText.Size = new System.Drawing.Size(726, 450);
             this.rtbTtsText.TabIndex = 0;
             this.rtbTtsText.Text = "";
@@ -306,6 +307,7 @@ namespace SpeechApp
             this.btnSpeak.Location = new System.Drawing.Point(0, 16);
             this.btnSpeak.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
             this.btnSpeak.Name = "btnSpeak";
+            this.btnSpeak.Click += new System.EventHandler(this.BtnSpeak_Click);
             this.btnSpeak.Size = new System.Drawing.Size(104, 40);
             this.btnSpeak.TabIndex = 0;
             this.btnSpeak.Text = "▶  Oku";
@@ -317,6 +319,7 @@ namespace SpeechApp
             this.btnPauseResume.Location = new System.Drawing.Point(112, 16);
             this.btnPauseResume.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
             this.btnPauseResume.Name = "btnPauseResume";
+            this.btnPauseResume.Click += new System.EventHandler(this.BtnPauseResume_Click);
             this.btnPauseResume.Size = new System.Drawing.Size(124, 40);
             this.btnPauseResume.TabIndex = 1;
             this.btnPauseResume.Text = "❚❚  Duraklat";
@@ -327,6 +330,7 @@ namespace SpeechApp
             this.btnStop.Location = new System.Drawing.Point(244, 16);
             this.btnStop.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
             this.btnStop.Name = "btnStop";
+            this.btnStop.Click += new System.EventHandler(this.BtnStop_Click);
             this.btnStop.Size = new System.Drawing.Size(104, 40);
             this.btnStop.TabIndex = 2;
             this.btnStop.Text = "■  Durdur";
@@ -337,6 +341,7 @@ namespace SpeechApp
             this.btnTtsClear.Location = new System.Drawing.Point(356, 16);
             this.btnTtsClear.Margin = new System.Windows.Forms.Padding(0, 0, 24, 0);
             this.btnTtsClear.Name = "btnTtsClear";
+            this.btnTtsClear.Click += new System.EventHandler(this.BtnTtsClear_Click);
             this.btnTtsClear.Size = new System.Drawing.Size(104, 40);
             this.btnTtsClear.TabIndex = 3;
             this.btnTtsClear.Text = "✕  Temizle";
@@ -475,6 +480,7 @@ namespace SpeechApp
             this.tbVolume.Location = new System.Drawing.Point(12, 246);
             this.tbVolume.Maximum = 100;
             this.tbVolume.Name = "tbVolume";
+            this.tbVolume.ValueChanged += new System.EventHandler(this.TbVolume_ValueChanged);
             this.tbVolume.Size = new System.Drawing.Size(304, 45);
             this.tbVolume.SmallChange = 5;
             this.tbVolume.TabIndex = 9;
@@ -512,6 +518,7 @@ namespace SpeechApp
             this.tbRate.Location = new System.Drawing.Point(12, 170);
             this.tbRate.Minimum = -10;
             this.tbRate.Name = "tbRate";
+            this.tbRate.ValueChanged += new System.EventHandler(this.TbRate_ValueChanged);
             this.tbRate.Size = new System.Drawing.Size(304, 45);
             this.tbRate.TabIndex = 6;
             this.tbRate.TickFrequency = 2;
@@ -557,6 +564,7 @@ namespace SpeechApp
             this.cmbVoice.FormattingEnabled = true;
             this.cmbVoice.Location = new System.Drawing.Point(20, 80);
             this.cmbVoice.Name = "cmbVoice";
+            this.cmbVoice.SelectedIndexChanged += new System.EventHandler(this.CmbVoice_SelectedIndexChanged);
             this.cmbVoice.Size = new System.Drawing.Size(290, 25);
             this.cmbVoice.TabIndex = 2;
             //
