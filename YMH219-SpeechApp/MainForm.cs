@@ -1,6 +1,7 @@
 using SpeechApp.Controls;
 using SpeechApp.Models;
 using SpeechApp.Services;
+using SpeechApp.UI;
 
 namespace SpeechApp;
 
@@ -14,12 +15,17 @@ public partial class MainForm : Form
     // Okumanın kullanıcı tarafından durdurulduğunu ayırt etmek için
     private bool _ttsStopRequested;
 
+    // Vurgulanan kelimenin metindeki konumu (-1: vurgu yok)
+    private int _highlightStart = -1;
+    private int _highlightLength;
+
     public MainForm()
     {
         InitializeComponent();
 
         // Servis olaylarına abone olunur
         _tts.StateChanged += Tts_StateChanged;
+        _tts.WordProgress += Tts_WordProgress;
         _tts.SpeakFinished += Tts_SpeakFinished;
     }
 
@@ -100,8 +106,11 @@ public partial class MainForm : Form
         try
         {
             _tts.Rate = tbRate.Value;
-            _ttsStopRequested = false;
             _tts.Volume = tbVolume.Value;
+            _ttsStopRequested = false;
+            ClearHighlight();
+            progressReading.Maximum = Math.Max(1, rtbTtsText.TextLength);
+            progressReading.Value = 0;
             _tts.Speak(rtbTtsText.Text);
             // Okuma sırasında metin değişirse vurgulama kayar; bu yüzden kilitlenir
             rtbTtsText.ReadOnly = true;
@@ -168,11 +177,60 @@ public partial class MainForm : Form
 
     private void Tts_StateChanged(object? sender, EventArgs e) => RunOnUi(UpdateUiState);
 
+    private void Tts_WordProgress(object? sender, WordProgressEventArgs e) => RunOnUi(() => HighlightWord(e));
+
+    // Okunan kelimeyi metin üzerinde sarı zeminle vurgular ve ilerlemeyi gösterir
+    private void HighlightWord(WordProgressEventArgs e)
+    {
+        ClearHighlight();
+        if (e.Position < 0 || e.Position + e.Length > rtbTtsText.TextLength)
+            return;
+
+        rtbTtsText.Select(e.Position, e.Length);
+        rtbTtsText.SelectionBackColor = Theme.WordHighlight;
+        rtbTtsText.ScrollToCaret();
+        // Seçim kaldırılır ki sistem seçim rengi vurguyu örtmesin
+        rtbTtsText.Select(e.Position + e.Length, 0);
+        _highlightStart = e.Position;
+        _highlightLength = e.Length;
+
+        int done = Math.Min(e.Position + e.Length, progressReading.Maximum);
+        progressReading.Value = done;
+        lblCurrentWord.Text = e.Word;
+        lblReadingDetail.Text = $"{done} / {rtbTtsText.TextLength} karakter  (%{done * 100 / Math.Max(1, rtbTtsText.TextLength)})";
+    }
+
+    // Önceki vurguyu metnin normal zemin rengine döndürür
+    private void ClearHighlight()
+    {
+        if (_highlightStart < 0)
+            return;
+
+        if (_highlightStart + _highlightLength <= rtbTtsText.TextLength)
+        {
+            int caret = rtbTtsText.SelectionStart;
+            rtbTtsText.Select(_highlightStart, _highlightLength);
+            rtbTtsText.SelectionBackColor = rtbTtsText.BackColor;
+            rtbTtsText.Select(caret, 0);
+        }
+
+        _highlightStart = -1;
+        _highlightLength = 0;
+    }
+
     private void Tts_SpeakFinished(object? sender, Exception? error)
     {
         RunOnUi(() =>
         {
+            ClearHighlight();
             rtbTtsText.ReadOnly = false;
+            lblCurrentWord.Text = "—";
+            lblReadingDetail.Text = _ttsStopRequested || error is not null
+                ? "Okuma yarıda kaldı"
+                : "Okuma tamamlandı";
+            if (!_ttsStopRequested && error is null)
+                progressReading.Value = progressReading.Maximum;
+
             if (error is not null)
             {
                 ShowError(new ServiceException("Ses Aygıtı Hatası",
