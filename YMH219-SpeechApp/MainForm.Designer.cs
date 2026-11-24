@@ -673,6 +673,7 @@ namespace SpeechApp
             this.btnListenStart.Location = new System.Drawing.Point(388, 0);
             this.btnListenStart.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
             this.btnListenStart.Name = "btnListenStart";
+            this.btnListenStart.Click += new System.EventHandler(this.BtnListenStart_Click);
             this.btnListenStart.Size = new System.Drawing.Size(180, 40);
             this.btnListenStart.TabIndex = 2;
             this.btnListenStart.Text = "●  Dinlemeyi Başlat";
@@ -684,6 +685,7 @@ namespace SpeechApp
             this.btnListenStop.Location = new System.Drawing.Point(576, 0);
             this.btnListenStop.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
             this.btnListenStop.Name = "btnListenStop";
+            this.btnListenStop.Click += new System.EventHandler(this.BtnListenStop_Click);
             this.btnListenStop.Size = new System.Drawing.Size(110, 40);
             this.btnListenStop.TabIndex = 3;
             this.btnListenStop.Text = "■  Durdur";
@@ -694,6 +696,7 @@ namespace SpeechApp
             this.btnSttClear.Location = new System.Drawing.Point(694, 0);
             this.btnSttClear.Margin = new System.Windows.Forms.Padding(0, 0, 24, 0);
             this.btnSttClear.Name = "btnSttClear";
+            this.btnSttClear.Click += new System.EventHandler(this.BtnSttClear_Click);
             this.btnSttClear.Size = new System.Drawing.Size(110, 40);
             this.btnSttClear.TabIndex = 4;
             this.btnSttClear.Text = "✕  Temizle";

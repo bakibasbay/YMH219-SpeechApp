@@ -11,6 +11,8 @@ public partial class MainForm : Form
     private const string AppTitle = "YMH219 - Speech App";
 
     private readonly TextToSpeechService _tts = new();
+    private readonly SpeechToTextService _stt = new();
+    private readonly List<RecognitionResultEntry> _results = new();
 
     // Okumanın kullanıcı tarafından durdurulduğunu ayırt etmek için
     private bool _ttsStopRequested;
@@ -27,20 +29,27 @@ public partial class MainForm : Form
         _tts.StateChanged += Tts_StateChanged;
         _tts.WordProgress += Tts_WordProgress;
         _tts.SpeakFinished += Tts_SpeakFinished;
+        _stt.Recognized += Stt_Recognized;
+        _stt.Hypothesized += Stt_Hypothesized;
+        _stt.ListeningChanged += Stt_ListeningChanged;
+        _stt.ErrorOccurred += Stt_ErrorOccurred;
     }
 
     protected override void OnLoad(EventArgs e)
     {
         base.OnLoad(e);
         LoadVoices();
+        LoadLanguages();
+        lblEnvInfo.Text = $"{cmbVoice.Items.Count} ses  ·  {cmbLanguage.Items.Count} tanıyıcı";
         ShowPage(showTts: true);
         UpdateUiState();
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        // Ses kaynakları kapatılır
+        // Ses ve mikrofon kaynakları kapatılır
         _tts.Dispose();
+        _stt.Dispose();
         base.OnFormClosed(e);
     }
 
@@ -248,22 +257,128 @@ public partial class MainForm : Form
 
     #endregion
 
+    #region Speech-to-Text
+
+    // Kurulu tanıyıcıların dillerini listeye doldurur
+    private void LoadLanguages()
+    {
+        cmbLanguage.Items.Clear();
+        var languages = SpeechToTextService.GetInstalledLanguages();
+        foreach (var language in languages)
+            cmbLanguage.Items.Add(language);
+
+        if (languages.Count == 0)
+            return;
+
+        string culture = Thread.CurrentThread.CurrentCulture.Name;
+        cmbLanguage.SelectedItem = languages.FirstOrDefault(l => l.Culture.Name == culture) ?? languages[0];
+    }
+
+    private void BtnListenStart_Click(object? sender, EventArgs e)
+    {
+        if (cmbLanguage.SelectedItem is not LanguageOption language)
+            return;
+
+        try
+        {
+            _stt.Start(language.Culture);
+            lblHypothesis.Text = "Dinleniyor… konuşmaya başlayabilirsiniz.";
+            SetStatusMessage($"Mikrofon dinleniyor ({language.Culture.Name}).");
+        }
+        catch (ServiceException ex)
+        {
+            ShowError(ex);
+            SetStatusMessage("Dinleme başlatılamadı.");
+        }
+
+        UpdateUiState();
+    }
+
+    private void BtnListenStop_Click(object? sender, EventArgs e)
+    {
+        _stt.Stop();
+        lblHypothesis.Text = "Dinleme durduruldu.";
+        SetStatusMessage("Dinleme durduruldu.");
+        UpdateUiState();
+    }
+
+    private void BtnSttClear_Click(object? sender, EventArgs e)
+    {
+        _results.Clear();
+        lvResults.Items.Clear();
+        rtbSttText.Clear();
+        UpdateResultCount();
+        SetStatusMessage("Tanıma sonuçları temizlendi.");
+        UpdateUiState();
+    }
+
+    private void Stt_Recognized(object? sender, RecognitionResultEntry entry) => RunOnUi(() => AddResult(entry));
+
+    // Tanınan sonucu metin alanına ekler ve listeye zaman/güven ile yazar
+    private void AddResult(RecognitionResultEntry entry)
+    {
+        _results.Add(entry);
+
+        if (rtbSttText.TextLength > 0)
+            rtbSttText.AppendText(" ");
+        rtbSttText.AppendText(entry.Text);
+        rtbSttText.ScrollToCaret();
+
+        var item = new ListViewItem(entry.Timestamp.ToString("HH:mm:ss"));
+        item.SubItems.Add($"%{entry.ConfidencePercent}");
+        item.SubItems.Add(entry.Text);
+        // Düşük güvenli sonuçlar turuncu gösterilir
+        if (entry.Confidence < 0.5f)
+            item.ForeColor = Color.FromArgb(194, 65, 12);
+        lvResults.Items.Add(item);
+        item.EnsureVisible();
+
+        lblHypothesis.Text = "Dinleniyor…";
+        UpdateResultCount();
+        UpdateUiState();
+    }
+
+    private void Stt_Hypothesized(object? sender, string text) =>
+        RunOnUi(() => lblHypothesis.Text = "Duyulan: " + text);
+
+    private void Stt_ListeningChanged(object? sender, EventArgs e) => RunOnUi(UpdateUiState);
+
+    private void Stt_ErrorOccurred(object? sender, ServiceException ex) => RunOnUi(() =>
+    {
+        ShowError(ex);
+        SetStatusMessage("Dinleme hatayla durdu.");
+        UpdateUiState();
+    });
+
+    private void UpdateResultCount() =>
+        lblSttListTitle.Text = _results.Count == 0 ? "Sonuç Listesi" : $"Sonuç Listesi ({_results.Count})";
+
+    #endregion
+
     #region Ortak yardımcılar
 
-    // Butonların aktif/pasif durumunu ve durum göstergesini günceller
+    // Butonların aktif/pasif durumunu ve durum göstergesini günceller.
+    // Okuma ve dinleme aynı anda yapılmaz (hoparlör sesi mikrofona karışmasın).
     private void UpdateUiState()
     {
         bool ttsBusy = _tts.IsBusy;
+        bool listening = _stt.IsListening;
         bool hasText = !string.IsNullOrWhiteSpace(rtbTtsText.Text);
 
-        btnSpeak.Enabled = hasText && !ttsBusy && cmbVoice.Items.Count > 0;
+        btnSpeak.Enabled = hasText && !ttsBusy && !listening && cmbVoice.Items.Count > 0;
         btnPauseResume.Enabled = ttsBusy;
         btnPauseResume.Text = _tts.IsPaused ? "▶  Devam Et" : "❚❚  Duraklat";
         btnStop.Enabled = ttsBusy;
         btnTtsClear.Enabled = hasText && !ttsBusy;
         cmbVoice.Enabled = !ttsBusy && cmbVoice.Items.Count > 0;
 
-        statusIndicator.Status = _tts.IsPaused ? AppStatus.Duraklatildi
+        btnListenStart.Enabled = !listening && !ttsBusy && cmbLanguage.SelectedItem is LanguageOption;
+        btnListenStop.Enabled = listening;
+        btnSttClear.Enabled = _results.Count > 0 || rtbSttText.TextLength > 0;
+        cmbLanguage.Enabled = !listening && cmbLanguage.Items.Count > 0;
+
+        statusIndicator.Status = listening ? AppStatus.Dinleniyor
+            : _tts.IsPaused ? AppStatus.Duraklatildi
             : _tts.IsSpeaking ? AppStatus.Okunuyor
             : AppStatus.Hazir;
 
