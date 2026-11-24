@@ -17,6 +17,14 @@ public partial class MainForm : Form
 
     private const string TextFileFilter = "Metin dosyaları (*.txt)|*.txt|Tüm dosyalar (*.*)|*.*";
 
+    private const string NoRecognizerMessage =
+        "Bu bilgisayarda kurulu bir konuşma tanıyıcı bulunamadı; Speech-to-Text kullanılamıyor.\n" +
+        "Ayarlar > Saat ve dil > Dil ve bölge > İngilizce (ABD) > Dil seçenekleri > \"Konuşma tanıma\" paketini indirip uygulamayı yeniden başlatın.\n" +
+        "(Windows'un yerleşik tanıyıcıları Türkçeyi desteklemez.)";
+
+    // Tanıyıcı yok uyarısı yalnızca bir kez MessageBox olarak gösterilir
+    private bool _sttWarningShown;
+
     // Okumanın kullanıcı tarafından durdurulduğunu ayırt etmek için
     private bool _ttsStopRequested;
 
@@ -44,8 +52,25 @@ public partial class MainForm : Form
         LoadVoices();
         LoadLanguages();
         lblEnvInfo.Text = $"{cmbVoice.Items.Count} ses  ·  {cmbLanguage.Items.Count} tanıyıcı";
+
+        // Tanıyıcı yoksa STT sekmesinde kalıcı uyarı bandı gösterilir
+        pnlSttWarningHost.Visible = cmbLanguage.Items.Count == 0;
+        lblSttWarning.Text = NoRecognizerMessage;
+
         ShowPage(showTts: true);
         UpdateUiState();
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        if (cmbVoice.Items.Count == 0)
+        {
+            MessageBox.Show(this,
+                "Bu bilgisayarda kurulu bir Text-to-Speech sesi bulunamadı; metin okuma kullanılamıyor.\n\n" +
+                "Ayarlar > Saat ve dil > Konuşma bölümünden bir ses ekleyebilirsiniz.",
+                "Ses Bulunamadı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
@@ -69,7 +94,16 @@ public partial class MainForm : Form
 
     private void BtnNavTts_Click(object? sender, EventArgs e) => ShowPage(showTts: true);
 
-    private void BtnNavStt_Click(object? sender, EventArgs e) => ShowPage(showTts: false);
+    private void BtnNavStt_Click(object? sender, EventArgs e)
+    {
+        ShowPage(showTts: false);
+        if (cmbLanguage.Items.Count == 0 && !_sttWarningShown)
+        {
+            _sttWarningShown = true;
+            MessageBox.Show(this, NoRecognizerMessage, "Konuşma Tanıyıcı Kurulu Değil",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
 
     #endregion
 

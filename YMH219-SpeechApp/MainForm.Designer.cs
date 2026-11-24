@@ -842,7 +842,7 @@ namespace SpeechApp
             this.pnlSttWarningHost.Location = new System.Drawing.Point(0, 0);
             this.pnlSttWarningHost.Name = "pnlSttWarningHost";
             this.pnlSttWarningHost.Padding = new System.Windows.Forms.Padding(0, 0, 0, 16);
-            this.pnlSttWarningHost.Size = new System.Drawing.Size(1140, 72);
+            this.pnlSttWarningHost.Size = new System.Drawing.Size(1140, 92);
             this.pnlSttWarningHost.TabIndex = 0;
             this.pnlSttWarningHost.Visible = false;
             //
@@ -854,7 +854,7 @@ namespace SpeechApp
             this.cardSttWarning.Location = new System.Drawing.Point(0, 0);
             this.cardSttWarning.Name = "cardSttWarning";
             this.cardSttWarning.Padding = new System.Windows.Forms.Padding(18, 6, 18, 6);
-            this.cardSttWarning.Size = new System.Drawing.Size(1140, 56);
+            this.cardSttWarning.Size = new System.Drawing.Size(1140, 76);
             this.cardSttWarning.TabIndex = 0;
             //
             // lblSttWarning
@@ -864,7 +864,7 @@ namespace SpeechApp
             this.lblSttWarning.ForeColor = System.Drawing.Color.FromArgb(146, 64, 14);
             this.lblSttWarning.Location = new System.Drawing.Point(18, 6);
             this.lblSttWarning.Name = "lblSttWarning";
-            this.lblSttWarning.Size = new System.Drawing.Size(1104, 44);
+            this.lblSttWarning.Size = new System.Drawing.Size(1104, 64);
             this.lblSttWarning.TabIndex = 0;
             this.lblSttWarning.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
