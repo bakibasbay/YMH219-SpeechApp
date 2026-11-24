@@ -13,6 +13,9 @@ public partial class MainForm : Form
     private readonly TextToSpeechService _tts = new();
     private readonly SpeechToTextService _stt = new();
     private readonly List<RecognitionResultEntry> _results = new();
+    private readonly FileService _fileService = new();
+
+    private const string TextFileFilter = "Metin dosyaları (*.txt)|*.txt|Tüm dosyalar (*.*)|*.*";
 
     // Okumanın kullanıcı tarafından durdurulduğunu ayırt etmek için
     private bool _ttsStopRequested;
@@ -355,6 +358,82 @@ public partial class MainForm : Form
 
     #endregion
 
+    #region Dosya işlemleri
+
+    // TTS metnini bir .txt dosyasından yükler
+    private void BtnOpenText_Click(object? sender, EventArgs e)
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Title = "Okunacak metin dosyasını seçin",
+            Filter = TextFileFilter
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+            return;
+
+        try
+        {
+            rtbTtsText.Text = _fileService.ReadText(dialog.FileName);
+            SetStatusMessage($"\"{Path.GetFileName(dialog.FileName)}\" açıldı.");
+        }
+        catch (ServiceException ex)
+        {
+            ShowError(ex);
+        }
+    }
+
+    // TTS metnini .txt olarak kaydeder
+    private void BtnSaveText_Click(object? sender, EventArgs e)
+    {
+        string? path = AskSavePath("Metni kaydet", $"metin-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+        if (path is null)
+            return;
+
+        try
+        {
+            _fileService.SaveText(path, rtbTtsText.Text);
+            SetStatusMessage($"Metin kaydedildi: {path}");
+        }
+        catch (ServiceException ex)
+        {
+            ShowError(ex);
+        }
+    }
+
+    // Tanıma sonuçlarını zaman damgası ve güven skoruyla kaydeder
+    private void BtnSaveResults_Click(object? sender, EventArgs e)
+    {
+        string? path = AskSavePath("Tanıma sonuçlarını kaydet", $"tanima-sonuclari-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+        if (path is null)
+            return;
+
+        string language = cmbLanguage.SelectedItem?.ToString() ?? "-";
+        try
+        {
+            _fileService.SaveResults(path, _results, language);
+            SetStatusMessage($"{_results.Count} sonuç kaydedildi: {path}");
+        }
+        catch (ServiceException ex)
+        {
+            ShowError(ex);
+        }
+    }
+
+    private string? AskSavePath(string title, string defaultName)
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Title = title,
+            Filter = TextFileFilter,
+            FileName = defaultName,
+            DefaultExt = "txt",
+            AddExtension = true
+        };
+        return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
+    }
+
+    #endregion
+
     #region Ortak yardımcılar
 
     // Butonların aktif/pasif durumunu ve durum göstergesini günceller.
@@ -371,11 +450,14 @@ public partial class MainForm : Form
         btnStop.Enabled = ttsBusy;
         btnTtsClear.Enabled = hasText && !ttsBusy;
         cmbVoice.Enabled = !ttsBusy && cmbVoice.Items.Count > 0;
+        btnOpenText.Enabled = !ttsBusy;
+        btnSaveText.Enabled = hasText;
 
         btnListenStart.Enabled = !listening && !ttsBusy && cmbLanguage.SelectedItem is LanguageOption;
         btnListenStop.Enabled = listening;
         btnSttClear.Enabled = _results.Count > 0 || rtbSttText.TextLength > 0;
         cmbLanguage.Enabled = !listening && cmbLanguage.Items.Count > 0;
+        btnSaveResults.Enabled = _results.Count > 0;
 
         statusIndicator.Status = listening ? AppStatus.Dinleniyor
             : _tts.IsPaused ? AppStatus.Duraklatildi

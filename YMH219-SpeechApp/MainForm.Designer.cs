@@ -352,6 +352,7 @@ namespace SpeechApp
             this.btnOpenText.Location = new System.Drawing.Point(484, 16);
             this.btnOpenText.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
             this.btnOpenText.Name = "btnOpenText";
+            this.btnOpenText.Click += new System.EventHandler(this.BtnOpenText_Click);
             this.btnOpenText.Size = new System.Drawing.Size(104, 40);
             this.btnOpenText.TabIndex = 4;
             this.btnOpenText.Text = "Aç (.txt)";
@@ -362,6 +363,7 @@ namespace SpeechApp
             this.btnSaveText.Location = new System.Drawing.Point(596, 16);
             this.btnSaveText.Margin = new System.Windows.Forms.Padding(0);
             this.btnSaveText.Name = "btnSaveText";
+            this.btnSaveText.Click += new System.EventHandler(this.BtnSaveText_Click);
             this.btnSaveText.Size = new System.Drawing.Size(124, 40);
             this.btnSaveText.TabIndex = 5;
             this.btnSaveText.Text = "Kaydet (.txt)";
@@ -707,6 +709,7 @@ namespace SpeechApp
             this.btnSaveResults.Location = new System.Drawing.Point(828, 0);
             this.btnSaveResults.Margin = new System.Windows.Forms.Padding(0);
             this.btnSaveResults.Name = "btnSaveResults";
+            this.btnSaveResults.Click += new System.EventHandler(this.BtnSaveResults_Click);
             this.btnSaveResults.Size = new System.Drawing.Size(190, 40);
             this.btnSaveResults.TabIndex = 5;
             this.btnSaveResults.Text = "Sonuçları Kaydet (.txt)";
