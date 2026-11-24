@@ -1,15 +1,13 @@
-using System.Globalization;
-using System.Runtime.InteropServices;
-using System.Speech.Recognition;
 using SpeechApp.Models;
 
 namespace SpeechApp.Services;
 
-// Mikrofondan alınan konuşmayı SpeechRecognitionEngine ile metne dönüştürür
+// Mikrofondan alınan konuşmayı metne dönüştürür.
+// Seçilen dile göre SAPI (System.Speech) ya da Windows (OneCore) motorunu kullanır.
 public sealed class SpeechToTextService : IDisposable
 {
-    private SpeechRecognitionEngine? _engine;
-    private string? _engineCulture;
+    private IRecognizerEngine? _engine;
+    private LanguageOption? _engineLanguage;
     private bool _disposed;
 
     // Bir cümle/ifade kesin olarak tanındığında tetiklenir
@@ -26,58 +24,33 @@ public sealed class SpeechToTextService : IDisposable
 
     public bool IsListening { get; private set; }
 
-    // Bilgisayarda kurulu tanıyıcıların dillerini döndürür
-    public static IReadOnlyList<LanguageOption> GetInstalledLanguages()
-    {
-        try
-        {
-            return SpeechRecognitionEngine.InstalledRecognizers()
-                .Select(r => new LanguageOption(r.Culture, r.Name))
-                .ToList();
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException)
-        {
-            return Array.Empty<LanguageOption>();
-        }
-    }
+    // Önce SAPI, ardından Windows altyapısında kurulu diller listelenir
+    public static IReadOnlyList<LanguageOption> GetInstalledLanguages() =>
+        SapiRecognizerEngine.GetLanguages()
+            .Concat(WindowsRecognizerEngine.GetLanguages())
+            .ToList();
 
     // Seçilen dilde mikrofonu dinlemeye başlar
-    public void Start(CultureInfo culture)
+    public async Task StartAsync(LanguageOption language)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (IsListening)
             return;
 
-        // Dil değiştiyse eski motor kapatılıp yenisi hazırlanır
-        if (_engine is null || _engineCulture != culture.Name)
+        // Dil veya altyapı değiştiyse eski motor kapatılıp yenisi hazırlanır
+        if (_engine is null || _engineLanguage != language)
         {
             DisposeEngine();
-            _engine = CreateEngine(culture);
-            _engineCulture = culture.Name;
+            _engine = language.Engine == RecognizerKind.Sapi
+                ? new SapiRecognizerEngine(language.Culture)
+                : new WindowsRecognizerEngine(language.Culture);
+            _engine.Recognized += Engine_Recognized;
+            _engine.Hypothesized += Engine_Hypothesized;
+            _engine.Stopped += Engine_Stopped;
+            _engineLanguage = language;
         }
 
-        try
-        {
-            _engine.SetInputToDefaultAudioDevice();
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or COMException)
-        {
-            throw new ServiceException("Mikrofon Bulunamadı",
-                "Varsayılan bir kayıt aygıtı (mikrofon) bulunamadı.\n\n" +
-                "Mikrofonun bağlı olduğundan ve Windows Ayarlar > Gizlilik ve güvenlik > Mikrofon " +
-                "bölümünde masaüstü uygulamalarının mikrofona erişimine izin verildiğinden emin olun.", ex);
-        }
-
-        try
-        {
-            _engine.RecognizeAsync(RecognizeMode.Multiple);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or COMException)
-        {
-            throw new ServiceException("Dinleme Başlatılamadı",
-                "Konuşma tanıma servisi başlatılamadı. Mikrofon başka bir uygulama tarafından kullanılıyor olabilir.", ex);
-        }
-
+        await _engine.StartAsync();
         IsListening = true;
         ListeningChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -88,74 +61,24 @@ public sealed class SpeechToTextService : IDisposable
         if (!IsListening || _engine is null)
             return;
 
-        _engine.RecognizeAsyncCancel();
+        _engine.Stop();
         IsListening = false;
         ListeningChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    // Seçilen dile ait tanıyıcıyı bulur ve serbest dikte dil bilgisiyle hazırlar
-    private SpeechRecognitionEngine CreateEngine(CultureInfo culture)
+    private void Engine_Recognized(object? sender, RecognitionResultEntry entry) => Recognized?.Invoke(this, entry);
+
+    private void Engine_Hypothesized(object? sender, string text) => Hypothesized?.Invoke(this, text);
+
+    private void Engine_Stopped(object? sender, ServiceException? error)
     {
-        RecognizerInfo? info;
-        try
-        {
-            info = SpeechRecognitionEngine.InstalledRecognizers()
-                .FirstOrDefault(r => r.Culture.Name.Equals(culture.Name, StringComparison.OrdinalIgnoreCase));
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException)
-        {
-            throw new ServiceException("Konuşma Servisi Hatası", "Windows konuşma tanıma servisine erişilemedi.", ex);
-        }
-
-        if (info is null)
-        {
-            throw new ServiceException("Tanıyıcı Kurulu Değil",
-                $"\"{culture.DisplayName}\" dili için kurulu bir konuşma tanıyıcı bulunamadı.");
-        }
-
-        SpeechRecognitionEngine? engine = null;
-        try
-        {
-            engine = new SpeechRecognitionEngine(info);
-            engine.LoadGrammar(new DictationGrammar());
-            engine.SpeechRecognized += Engine_SpeechRecognized;
-            engine.SpeechHypothesized += Engine_SpeechHypothesized;
-            engine.RecognizeCompleted += Engine_RecognizeCompleted;
-            return engine;
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or COMException or ArgumentException)
-        {
-            engine?.Dispose();
-            throw new ServiceException("Tanıyıcı Başlatılamadı",
-                $"\"{culture.DisplayName}\" tanıyıcısı yüklenemedi veya serbest dikteyi desteklemiyor.", ex);
-        }
-    }
-
-    private void Engine_SpeechRecognized(object? sender, SpeechRecognizedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(e.Result.Text))
+        if (!IsListening)
             return;
 
-        Recognized?.Invoke(this, new RecognitionResultEntry(e.Result.Text, DateTime.Now, e.Result.Confidence));
-    }
-
-    private void Engine_SpeechHypothesized(object? sender, SpeechHypothesizedEventArgs e) =>
-        Hypothesized?.Invoke(this, e.Result.Text);
-
-    private void Engine_RecognizeCompleted(object? sender, RecognizeCompletedEventArgs e)
-    {
-        // Kullanıcı durdurmadıysa (ör. mikrofon çıkarıldı) durum ve hata bildirilir
-        bool wasListening = IsListening;
         IsListening = false;
-
-        if (e.Error is not null)
-        {
-            ErrorOccurred?.Invoke(this, new ServiceException("Dinleme Kesildi",
-                "Konuşma tanıma beklenmedik şekilde durdu. Mikrofon bağlantısını kontrol edin.\n\nAyrıntı: " + e.Error.Message, e.Error));
-        }
-
-        if (wasListening)
-            ListeningChanged?.Invoke(this, EventArgs.Empty);
+        if (error is not null)
+            ErrorOccurred?.Invoke(this, error);
+        ListeningChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void DisposeEngine()
@@ -163,15 +86,12 @@ public sealed class SpeechToTextService : IDisposable
         if (_engine is null)
             return;
 
-        _engine.SpeechRecognized -= Engine_SpeechRecognized;
-        _engine.SpeechHypothesized -= Engine_SpeechHypothesized;
-        _engine.RecognizeCompleted -= Engine_RecognizeCompleted;
-        if (IsListening)
-            _engine.RecognizeAsyncCancel();
-
+        _engine.Recognized -= Engine_Recognized;
+        _engine.Hypothesized -= Engine_Hypothesized;
+        _engine.Stopped -= Engine_Stopped;
         _engine.Dispose();
         _engine = null;
-        _engineCulture = null;
+        _engineLanguage = null;
         IsListening = false;
     }
 

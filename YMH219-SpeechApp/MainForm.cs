@@ -277,16 +277,19 @@ public partial class MainForm : Form
         cmbLanguage.SelectedItem = languages.FirstOrDefault(l => l.Culture.Name == culture) ?? languages[0];
     }
 
-    private void BtnListenStart_Click(object? sender, EventArgs e)
+    private async void BtnListenStart_Click(object? sender, EventArgs e)
     {
         if (cmbLanguage.SelectedItem is not LanguageOption language)
             return;
 
+        // Başlatma sürerken ikinci kez tıklanmasın
+        btnListenStart.Enabled = false;
+        SetStatusMessage("Mikrofon hazırlanıyor…");
         try
         {
-            _stt.Start(language.Culture);
+            await _stt.StartAsync(language);
             lblHypothesis.Text = "Dinleniyor… konuşmaya başlayabilirsiniz.";
-            SetStatusMessage($"Mikrofon dinleniyor ({language.Culture.Name}).");
+            SetStatusMessage($"Mikrofon dinleniyor ({language.Culture.Name}, {language.EngineName}).");
         }
         catch (ServiceException ex)
         {
