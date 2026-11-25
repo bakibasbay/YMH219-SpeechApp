@@ -1,6 +1,6 @@
 # YMH219 - Speech App (Speech-to-Text ve Text-to-Speech)
 
-Ses ile metin arasında iki yönlü dönüşüm yapan bir Windows Forms uygulaması. **Text-to-Speech** bölümünde yazılan metin sesli okunur ve okunan kelime metin üzerinde anlık olarak vurgulanır. **Speech-to-Text** bölümünde mikrofondan alınan konuşma metne dönüştürülür; her sonuç zaman damgası ve güven skoruyla listelenir.
+Ses ile metin arasında iki yönlü dönüşüm yapan bir Windows Forms uygulaması. **Text-to-Speech** bölümünde yazılan metin sesli okunur ve okunan kelime metin üzerinde anlık olarak vurgulanır; Türkçe ses (Microsoft Tolga) varsayılan olarak kullanılır. **Speech-to-Text** bölümünde mikrofondan alınan konuşma metne dönüştürülür; her sonuç zaman damgası ve güven skoruyla listelenir.
 
 Bu proje, YMH 219 Nesne Tabanlı Programlama dersi ek uygulama ödevlerinin **6. ödevidir**.
 
@@ -11,8 +11,8 @@ Bu proje, YMH 219 Nesne Tabanlı Programlama dersi ek uygulama ödevlerinin **6.
 | C# | Programlama dili |
 | .NET 8 (`net8.0-windows10.0.19041.0`) | Hedef çatı (Windows 10 2004 ve üzeri) |
 | Windows Forms | Masaüstü arayüzü |
-| [`System.Speech`](https://www.nuget.org/packages/System.Speech) 8.0.0 (NuGet) | `SpeechSynthesizer` ile metin okuma, `SpeechRecognitionEngine` ile SAPI konuşma tanıma |
-| `Windows.Media.SpeechRecognition` (Windows SDK) | SAPI tanıyıcısı olmayan Windows 11 sürümlerinde dikte tanıma |
+| [`System.Speech`](https://www.nuget.org/packages/System.Speech) 8.0.0 (NuGet) | `SpeechSynthesizer` ile SAPI sesleriyle okuma, `SpeechRecognitionEngine` ile konuşma tanıma |
+| `Windows.Media.SpeechSynthesis` + `MediaPlayer` (Windows SDK) | Windows OneCore sesleriyle (ör. Türkçe *Microsoft Tolga*) okuma ve kelime sınırı bilgisi |
 | GDI+ (`System.Drawing`) | Yuvarlak butonlar, kartlar ve durum göstergesi simgelerinin çizimi |
 | Visual Studio 2022 / 2026 | Geliştirme ortamı |
 
@@ -41,21 +41,21 @@ dotnet run --project YMH219-SpeechApp
 ```
 
 ### Konuşma tanıma için Windows ayarları
-Windows'un yerleşik tanıyıcıları **Türkçeyi desteklemez**. Speech-to-Text için desteklenen bir dilin (ör. İngilizce - ABD) konuşma paketi kurulu olmalıdır:
+Windows'un yerleşik tanıyıcısı **Türkçeyi desteklemez**. Speech-to-Text için İngilizce (ABD) konuşma paketi kurulu olmalıdır:
 
-1. **Ayarlar > Saat ve dil > Dil ve bölge** bölümünde *İngilizce (Amerika Birleşik Devletleri)* dilini ekleyin (yoksa).
-2. Dilin yanındaki **… > Dil seçenekleri > Konuşma tanıma** paketini indirin.
-3. Windows (OneCore) altyapısı kullanılacaksa **Ayarlar > Gizlilik ve güvenlik > Konuşma > Çevrimiçi konuşma tanıma** seçeneğini açın.
-4. **Ayarlar > Gizlilik ve güvenlik > Mikrofon** bölümünde *Masaüstü uygulamalarının mikrofonunuza erişmesine izin verin* seçeneğinin açık olduğundan emin olun.
-5. Uygulamayı yeniden başlatın; dil, **Tanıma dili** listesinde görünür.
+1. **Ayarlar > Saat ve dil > Dil ve bölge** bölümünde *İngilizce (Amerika Birleşik Devletleri)* dilini ekleyin.
+2. Dilin yanındaki **… > Dil seçenekleri > Konuşma tanıma** paketini indirin. Bu paket, `System.Speech`'in kullandığı *Microsoft Speech Recognizer 8.0 (English - US)* tanıyıcısını kurar.
+3. **Ayarlar > Gizlilik ve güvenlik > Mikrofon** bölümünde *Mikrofon erişimi* ve *Masaüstü uygulamalarının mikrofonunuza erişmesine izin verin* seçeneklerinin açık olduğundan emin olun.
+4. Uygulamayı yeniden başlatın; dil, **Tanıma dili** listesinde görünür.
 
 ## Kullanım
 
 ### Text-to-Speech
 1. **Text-to-Speech** sekmesinde metni yazın veya **Aç (.txt)** ile bir dosyadan yükleyin.
-2. Sağ panelden sesi seçin; **Hız** ve **Ses düzeyi** kaydırıcılarını ayarlayın.
-3. **▶ Oku** ile okumayı başlatın. Okunan kelime sarı zeminle vurgulanır, sağda kelime ve ilerleme yüzdesi görünür.
-4. **❚❚ Duraklat / ▶ Devam Et**, **■ Durdur** ve **✕ Temizle** ile okumayı yönetin; **Kaydet (.txt)** ile metni kaydedin.
+2. Sağ panelden sesi seçin. Liste her sesin altyapısını gösterir (`· SAPI` / `· Windows`); kurulu bir Türkçe ses varsa varsayılan olarak o seçilir.
+3. **Hız** ve **Ses düzeyi** kaydırıcılarını ayarlayın.
+4. **▶ Oku** ile okumayı başlatın. Okunan kelime sarı zeminle vurgulanır, sağda kelime ve ilerleme yüzdesi görünür.
+5. **❚❚ Duraklat / ▶ Devam Et**, **■ Durdur** ve **✕ Temizle** ile okumayı yönetin; **Kaydet (.txt)** ile metni kaydedin.
 
 ### Speech-to-Text
 1. **Speech-to-Text** sekmesinde **Tanıma dili** listesinden dili seçin (yalnızca kurulu tanıyıcılar listelenir).
@@ -66,15 +66,16 @@ Windows'un yerleşik tanıyıcıları **Türkçeyi desteklemez**. Speech-to-Text
 ## Özellikler
 
 - **Text-to-Speech:** oku, duraklat / devam et, durdur, temizle
-- Kurulu seslerden **ses seçimi**, **hız** (-10…+10) ve **ses düzeyi** (%0…%100) ayarı
-- `SpeakProgress` olayı ile **okunan kelimenin vurgulanması**, ilerleme çubuğu ve yüzde bilgisi
+- **İki ses altyapısı:** SAPI masaüstü sesleri (`System.Speech`) ve Windows OneCore sesleri (`Windows.Media.SpeechSynthesis`); seçilen sese göre ilgili motor otomatik kullanılır, varsayılan ses Türkçedir
+- **Hız** (-10…+10) ve **ses düzeyi** (%0…%100) ayarı
+- **Okunan kelimenin vurgulanması** iki altyapıda da: SAPI'de `SpeakProgress` olayı, Windows'ta ses akışındaki kelime sınırı izi (`SpeechCue`) kullanılır; ilerleme çubuğu ve yüzde bilgisi gösterilir
 - Metni **.txt olarak açma / kaydetme** (UTF-8; eski Türkçe ANSI/Windows-1254 dosyalar da doğru okunur)
-- **Speech-to-Text:** dinlemeyi başlat / durdur, temizle; tanınan metnin metin alanına eklenmesi
+- **Speech-to-Text:** dinlemeyi başlat / durdur, temizle; tanınan metnin metin alanına eklenmesi ve ara sonuçların canlı gösterimi
 - Sonuçların **zaman damgası ve güven skoruyla** `ListView`'da listelenmesi ve `.txt` olarak kaydedilmesi
-- Kurulu tanıyıcılara göre **dil seçimi**; SAPI ve Windows altyapıları otomatik listelenir
+- Kurulu tanıyıcılara göre **dil seçimi**
 - **Belirgin durum göstergesi:** *Hazır* (gri), *Okunuyor…* (yeşil, hoparlör simgesi), *Duraklatıldı* (turuncu), *Dinleniyor…* (kırmızı, **yanıp sönen mikrofon simgesi**). Simgeler GDI+ ile kodla çizilir; durum pencere başlığında da gösterilir.
 - Okuma ve dinleme aynı anda yapılmaz (hoparlör sesinin mikrofona karışmaması için); butonlar duruma göre aktif/pasif olur
-- **Hata yönetimi:** mikrofon yok / izin yok, tanıyıcı veya dil kurulu değil, çevrimiçi konuşma tanıma kapalı, ses aygıtı hatası, dosya hataları (izin, kilitli dosya, 2 MB sınırı) anlaşılır `MessageBox` ile bildirilir; beklenmeyen hatalar genel yakalayıcıyla gösterilir, uygulama kapanmaz
+- **Hata yönetimi:** mikrofon yok, mikrofon izni kapalı (dinleme öncesinde Windows gizlilik ayarı kontrol edilir), tanıyıcı/dil kurulu değil, ses aygıtı/sentez hatası, dosya hataları (izin, kilitli dosya, 2 MB sınırı) anlaşılır `MessageBox` ile bildirilir; beklenmeyen hatalar genel yakalayıcıyla gösterilir, uygulama kapanmaz
 - Servisler `IDisposable`'dır; pencere kapanırken okuma durdurulur, mikrofon ve ses kaynakları serbest bırakılır
 
 ## Proje Yapısı ve Sınıf Tasarımı
@@ -90,16 +91,16 @@ YMH219-SpeechApp/
     ├── MainForm.Designer.cs           # Kontrollerin yerleşimi
     ├── Models/
     │   ├── RecognitionResultEntry.cs  # Tanıma sonucu: metin, zaman, güven
-    │   ├── VoiceOption.cs             # Ses listesi öğesi
-    │   ├── LanguageOption.cs          # Dil listesi öğesi (dil + altyapı)
-    │   ├── RecognizerKind.cs          # Sapi / Windows
+    │   ├── VoiceOption.cs             # Ses listesi öğesi (ses + altyapı)
+    │   ├── SpeechEngineKind.cs        # Sapi / Windows
+    │   ├── LanguageOption.cs          # Dil listesi öğesi
     │   └── AppStatus.cs               # Hazır / Okunuyor / Duraklatıldı / Dinleniyor
     ├── Services/
-    │   ├── TextToSpeechService.cs     # SpeechSynthesizer sarmalayıcısı
-    │   ├── SpeechToTextService.cs     # Tanıma servisi (motor seçimi, olaylar)
-    │   ├── IRecognizerEngine.cs       # Tanıma motorları için ortak arayüz
-    │   ├── SapiRecognizerEngine.cs    # System.Speech (SAPI) motoru
-    │   ├── WindowsRecognizerEngine.cs # Windows.Media.SpeechRecognition motoru
+    │   ├── TextToSpeechService.cs     # Okuma servisi: sese göre motor seçimi, olaylar
+    │   ├── ISpeechEngine.cs           # Okuma motorları için ortak arayüz
+    │   ├── SapiSpeechEngine.cs        # System.Speech (SAPI) motoru
+    │   ├── WindowsSpeechEngine.cs     # Windows.Media.SpeechSynthesis + MediaPlayer motoru
+    │   ├── SpeechToTextService.cs     # SpeechRecognitionEngine ile mikrofon tanıma
     │   ├── FileService.cs             # .txt kaydet / aç
     │   ├── ServiceException.cs        # Kullanıcıya gösterilecek hata
     │   └── WordProgressEventArgs.cs   # Okunan kelime bilgisi
@@ -113,11 +114,11 @@ YMH219-SpeechApp/
 
 | Sınıf | Sorumluluk |
 |---|---|
-| `TextToSpeechService` | `SpeechSynthesizer`'ı kapsüller: `Speak`, `Pause`, `Resume`, `Stop`, `Rate`, `Volume`, `SelectVoice`. `WordProgress`, `StateChanged`, `SpeakFinished` olaylarını yayınlar. `IDisposable`. |
-| `SpeechToTextService` | Seçilen dile göre uygun motoru (`IRecognizerEngine`) oluşturur; `StartAsync`, `Stop` ve `Recognized`, `Hypothesized`, `ListeningChanged`, `ErrorOccurred` olaylarını sağlar. `IDisposable`. |
-| `IRecognizerEngine` | SAPI ve Windows motorlarının ortak sözleşmesi (çok biçimlilik). |
-| `SapiRecognizerEngine` | `SpeechRecognitionEngine` + `DictationGrammar` ile mikrofondan sürekli tanıma. |
-| `WindowsRecognizerEngine` | `SpeechRecognizer.ContinuousRecognitionSession` ile sürekli dikte; gizlilik/mikrofon/ağ hatalarını anlaşılır mesajlara çevirir. |
+| `TextToSpeechService` | Seçilen sesin altyapısına göre etkin motoru (`ISpeechEngine`) belirler; `SpeakAsync`, `Pause`, `Resume`, `Stop`, `Rate`, `Volume`, `SelectVoice` sağlar ve `WordProgress`, `StateChanged`, `SpeakFinished` olaylarını yalnızca etkin motordan aktarır. `IDisposable`. |
+| `ISpeechEngine` | SAPI ve Windows okuma motorlarının ortak sözleşmesi (çok biçimlilik). |
+| `SapiSpeechEngine` | `System.Speech.Synthesis.SpeechSynthesizer` ile okuma; kelime konumu `SpeakProgress` olayından gelir. |
+| `WindowsSpeechEngine` | Metni `SynthesizeTextToStreamAsync` ile ses akışına çevirir, `MediaPlayer` ile çalar; kelime konumu akıştaki `SpeechWord` izinin `SpeechCue` öğelerinden okunur. |
+| `SpeechToTextService` | `SpeechRecognitionEngine` + `DictationGrammar` ile mikrofondan sürekli tanıma; `Start`, `Stop` ve `Recognized`, `Hypothesized`, `ListeningChanged`, `ErrorOccurred` olayları. Dinleme öncesi mikrofon iznini kontrol eder. `IDisposable`. |
 | `RecognitionResultEntry` | Değiştirilemez sonuç nesnesi (`Text`, `Timestamp`, `Confidence`); `ToString()` kayıt biçimini üretir. |
 | `FileService` | Metin ve sonuç dosyalarını okur/yazar; G/Ç hatalarını `ServiceException`'a çevirir. |
 | `ServiceException` | Başlık + açıklama taşıyan, doğrudan `MessageBox`'ta gösterilebilen hata. |
@@ -125,23 +126,23 @@ YMH219-SpeechApp/
 
 ## Ekran Görüntüleri
 
-### Text-to-Speech: okuma sırasında kelime vurgusu ve "Okunuyor…" göstergesi
+### Text-to-Speech: Türkçe ses (Microsoft Tolga) ile okuma, kelime vurgusu ve "Okunuyor…" göstergesi
 ![Text-to-Speech okunuyor](screenshots/screenshot1.png)
 
-### Speech-to-Text: tanıma sonuçları zaman damgası ve güven skoruyla
+### Speech-to-Text: gerçek konuşmadan tanınan sonuçlar, zaman damgası ve güven skoru, "Dinleniyor…" göstergesi
 ![Speech-to-Text sonuç listesi](screenshots/screenshot2.png)
 
 ## Bilinen Sınırlamalar / Geliştirme Notları
 
-- **Türkçe konuşma tanıma yoktur.** Ne SAPI (`System.Speech`) ne de Windows'un OneCore tanıyıcısı (`Windows.Media.SpeechRecognition`) Türkçe dikte desteği sunar. Uygulama İngilizce (ABD) gibi desteklenen ve kurulu bir dille kullanılmalıdır.
-- **Altyapı seçimi ve gerekçesi:** Geliştirme bilgisayarında (Windows 11 26H2, Türkçe) yapılan incelemede `SpeechRecognitionEngine.InstalledRecognizers()` boş döndü; Windows'un dikte dilleri (`SpeechRecognizer.SupportedTopicLanguages`) de boştu. Windows 11 24H2 ile *Windows Konuşma Tanıma* kaldırıldığı için yeni sürümlerde SAPI masaüstü tanıyıcısı bulunmayabilir. Bu nedenle tanıma iki altyapılı tasarlandı: SAPI tanıyıcısı varsa (Windows 10 / eski Windows 11) `System.Speech`, yoksa konuşma paketi kurulduğunda Windows'un desteklenen modern API'si `Windows.Media.SpeechRecognition` kullanılır. Bu API için hedef çatı `net8.0-windows10.0.19041.0` olarak seçildi.
-- Windows altyapısıyla dikte, **çevrimiçi konuşma tanıma** iznine ve internet bağlantısına ihtiyaç duyar; ayar kapalıysa uygulama nasıl açılacağını söyleyen bir uyarı gösterir.
-- Bu bilgisayarda TTS için `System.Speech` yalnızca **Microsoft Zira Desktop (en-US)** sesini görebiliyor. Türkçe *Microsoft Tolga* sesi yalnızca Windows OneCore ses deposunda kurulu olduğu için SAPI tarafından listelenmez; Türkçe metinler İngilizce sesin aksanıyla okunur.
-- Hız ve ses düzeyi değişiklikleri bir sonraki **Oku** işleminde uygulanır: SAPI, kuyruğa alınmış metnin ayarlarını okuma sırasında değiştirmez (okurken hız +10 yapıldığında okuma hızı değişmedi, yeni okumada yaklaşık 3 katına çıktı).
+- **Türkçe konuşma tanıma yoktur.** Windows'un yerleşik tanıyıcıları Türkçe dikteyi desteklemez; uygulama İngilizce (ABD) tanıyıcıyla kullanılır.
+- **Tanıma doğruluğu düşüktür.** Kullanılan *Microsoft Speech Recognizer 8.0* eski bir masaüstü dikte motorudur, ana dili İngilizce olan konuşmacılar için eğitilmiştir ve Windows 11 24H2 ile ses eğitimi aracı kaldırıldığı için kullanıcıya uyarlanamaz. Gerçek konuşmayla yapılan testte (dizüstü dahili mikrofonu, Türkçe aksanlı İngilizce) sonuçlar listeye zaman ve güvenle düştü, ancak ifadelerin çoğu yanlış tanındı ve güven skorları %0–53 arasında kaldı. Bu sınır uygulamanın değil motorun sınırıdır; ekran görüntüsündeki sonuçlar da bu testten gelir.
+- **Windows.Media.SpeechRecognition denendi ve çıkarıldı.** Modern Windows dikte API'si de denendi: motor sesi aldı ve konuşmayı algıladı (`SpeechDetected`), ancak çevrimiçi konuşma tanıma ve mikrofon izinleri açık olmasına rağmen üç gerçek konuşma denemesinde hiç ara sonuç ya da sonuç üretmedi. Masaüstü uygulamalarında bu API'nin pencere odağı kaybolunca sessizce devre dışı kaldığı da bildirilmektedir. Çalıştığı doğrulanamadığı için tanıma yalnızca `System.Speech` ile yapılır.
+- **Türkçe ses yalnızca Windows altyapısında vardır.** *Microsoft Tolga (tr-TR)* bir OneCore sesidir ve `System.Speech` tarafından görülmez; bu yüzden ikinci TTS motoru (`Windows.Media.SpeechSynthesis`) eklendi ve hedef çatı `net8.0-windows10.0.19041.0` olarak seçildi.
+- Hız değişikliği bir sonraki **Oku** işleminde uygulanır: SAPI kuyruğa alınmış metnin hızını okuma sırasında değiştirmez (okurken hız +10 yapıldığında okuma hızı değişmedi, yeni okumada yaklaşık 3 katına çıktı); Windows altyapısında ise hız metin sese dönüştürülürken uygulanır.
 - Okuma sırasında kelime vurgusunun kaymaması için metin alanı salt okunur yapılır.
-- Güven skoru tanıyıcıdan gelir; Windows altyapısı ham skor vermezse *Yüksek/Orta/Düşük* seviyesi yaklaşık yüzdeye (%90/%70/%40) çevrilir.
+- Mikrofon izni dinleme öncesinde Windows gizlilik ayarından okunur; izin kapalıyken `System.Speech` hata vermeden başlayıp sonradan kesildiği için bu kontrol eklenmiştir.
 - Açılabilecek metin dosyası 2 MB ile sınırlıdır; kayıtlar UTF-8 (BOM'lu) olarak yazılır.
-- Olası geliştirmeler: Vosk gibi çevrimdışı bir kütüphane ile Türkçe tanıma, Windows OneCore seslerinin (ör. Tolga) `Windows.Media.SpeechSynthesis` ile TTS'e eklenmesi.
+- Olası geliştirmeler: Vosk gibi çevrimdışı bir kütüphane ile Türkçe ve daha doğru konuşma tanıma, harici/kulaklık mikrofonu seçimi.
 
 ## Öğrenci
 
