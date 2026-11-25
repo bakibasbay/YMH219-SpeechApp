@@ -415,7 +415,7 @@ namespace SpeechApp
             this.lblSettingsNote.Name = "lblSettingsNote";
             this.lblSettingsNote.Size = new System.Drawing.Size(290, 38);
             this.lblSettingsNote.TabIndex = 15;
-            this.lblSettingsNote.Text = "Hız ve ses düzeyi değişiklikleri bir sonraki okumada uygulanır. Okunan kelime metin üzerinde vurgulanır.";
+            this.lblSettingsNote.Text = "Hız değişikliği bir sonraki okumada uygulanır. Okunan kelime metin üzerinde vurgulanır.";
             //
             // lblReadingDetail
             //

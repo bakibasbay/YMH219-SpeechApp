@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <!-- Windows.Media.SpeechRecognition (WinRT) için Windows 10 2004+ SDK hedeflenir -->
+    <!-- Windows.Media.SpeechSynthesis (WinRT, OneCore sesleri) için Windows 10 2004+ SDK hedeflenir -->
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <RootNamespace>SpeechApp</RootNamespace>
     <AssemblyName>YMH219-SpeechApp</AssemblyName>

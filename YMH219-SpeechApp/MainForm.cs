@@ -109,7 +109,7 @@ public partial class MainForm : Form
 
     #region Text-to-Speech
 
-    // Kurulu sesleri listeye doldurur; mümkünse sistem diline uygun sesi seçer
+    // Kurulu sesleri listeye doldurur; varsayılan olarak Türkçe ses seçilir
     private void LoadVoices()
     {
         cmbVoice.Items.Clear();
@@ -124,12 +124,23 @@ public partial class MainForm : Form
             return;
         }
 
+        // Öncelik: Türkçe ses, sonra arayüz diline uygun ses, sonra ilk ses
         string uiCulture = Thread.CurrentThread.CurrentUICulture.Name;
-        var preferred = voices.FirstOrDefault(v => v.Culture == uiCulture) ?? voices[0];
+        var preferred = voices.FirstOrDefault(v => v.Culture.StartsWith("tr", StringComparison.OrdinalIgnoreCase))
+            ?? voices.FirstOrDefault(v => v.Culture == uiCulture)
+            ?? voices[0];
         cmbVoice.SelectedItem = preferred;
+        UpdateVoiceHint();
+    }
 
-        if (!voices.Any(v => v.Culture.StartsWith("tr", StringComparison.OrdinalIgnoreCase)))
-            lblVoiceHint.Text = "Kurulu Türkçe ses yok; Türkçe metinler bu sesin aksanıyla okunur.";
+    private void UpdateVoiceHint()
+    {
+        if (cmbVoice.SelectedItem is not VoiceOption voice)
+            return;
+
+        lblVoiceHint.Text = voice.Culture.StartsWith("tr", StringComparison.OrdinalIgnoreCase)
+            ? $"Türkçe ses · {voice.EngineName} altyapısı"
+            : $"{voice.Culture} sesi · Türkçe metinler bu sesin aksanıyla okunur.";
     }
 
     private void CmbVoice_SelectedIndexChanged(object? sender, EventArgs e)
@@ -139,16 +150,20 @@ public partial class MainForm : Form
 
         try
         {
-            _tts.SelectVoice(voice.Name);
+            _tts.SelectVoice(voice);
         }
         catch (ServiceException ex)
         {
             ShowError(ex);
         }
+
+        UpdateVoiceHint();
     }
 
-    private void BtnSpeak_Click(object? sender, EventArgs e)
+    private async void BtnSpeak_Click(object? sender, EventArgs e)
     {
+        // Windows sesinde sentez kısa sürer; bu arada ikinci kez tıklanmasın
+        btnSpeak.Enabled = false;
         try
         {
             _tts.Rate = tbRate.Value;
@@ -157,13 +172,15 @@ public partial class MainForm : Form
             ClearHighlight();
             progressReading.Maximum = Math.Max(1, rtbTtsText.TextLength);
             progressReading.Value = 0;
-            _tts.Speak(rtbTtsText.Text);
             // Okuma sırasında metin değişirse vurgulama kayar; bu yüzden kilitlenir
             rtbTtsText.ReadOnly = true;
             SetStatusMessage("Metin okunuyor…");
+            await _tts.SpeakAsync(rtbTtsText.Text);
         }
         catch (ServiceException ex)
         {
+            rtbTtsText.ReadOnly = false;
+            SetStatusMessage("Okuma başlatılamadı.");
             ShowError(ex);
         }
 

@@ -1,21 +1,27 @@
-using System.Runtime.InteropServices;
-using System.Speech.Synthesis;
 using SpeechApp.Models;
 
 namespace SpeechApp.Services;
 
-// Metni sesli okuma işlemlerini SpeechSynthesizer üzerinden yönetir
+// Metni sesli okuma işlemlerini yönetir. Seçilen sese göre SAPI (System.Speech)
+// ya da Windows (Windows.Media.SpeechSynthesis) motorunu kullanır.
 public sealed class TextToSpeechService : IDisposable
 {
-    private readonly SpeechSynthesizer _synthesizer;
+    private readonly SapiSpeechEngine _sapi = new();
+    private readonly WindowsSpeechEngine _windows = new();
+    private ISpeechEngine _current;
+    private int _rate;
+    private int _volume = 100;
     private bool _disposed;
 
     public TextToSpeechService()
     {
-        _synthesizer = new SpeechSynthesizer();
-        _synthesizer.SpeakProgress += Synthesizer_SpeakProgress;
-        _synthesizer.StateChanged += Synthesizer_StateChanged;
-        _synthesizer.SpeakCompleted += Synthesizer_SpeakCompleted;
+        _current = _sapi;
+        foreach (var engine in new ISpeechEngine[] { _sapi, _windows })
+        {
+            engine.WordProgress += Engine_WordProgress;
+            engine.StateChanged += Engine_StateChanged;
+            engine.SpeakFinished += Engine_SpeakFinished;
+        }
     }
 
     // Okunan her kelimede tetiklenir (vurgulama için)
@@ -27,9 +33,9 @@ public sealed class TextToSpeechService : IDisposable
     // Okuma bittiğinde veya durdurulduğunda tetiklenir; hata varsa taşır
     public event EventHandler<Exception?>? SpeakFinished;
 
-    public bool IsSpeaking => !_disposed && _synthesizer.State == SynthesizerState.Speaking;
+    public bool IsSpeaking => !_disposed && _current.IsSpeaking;
 
-    public bool IsPaused => !_disposed && _synthesizer.State == SynthesizerState.Paused;
+    public bool IsPaused => !_disposed && _current.IsPaused;
 
     // Okuma sürüyor ya da duraklatılmış
     public bool IsBusy => IsSpeaking || IsPaused;
@@ -37,132 +43,96 @@ public sealed class TextToSpeechService : IDisposable
     // Konuşma hızı: -10 (yavaş) ile 10 (hızlı) arası
     public int Rate
     {
-        get => _synthesizer.Rate;
-        set => _synthesizer.Rate = Math.Clamp(value, -10, 10);
+        get => _rate;
+        set
+        {
+            _rate = Math.Clamp(value, -10, 10);
+            _current.Rate = _rate;
+        }
     }
 
     // Ses düzeyi: 0 ile 100 arası
     public int Volume
     {
-        get => _synthesizer.Volume;
-        set => _synthesizer.Volume = Math.Clamp(value, 0, 100);
+        get => _volume;
+        set
+        {
+            _volume = Math.Clamp(value, 0, 100);
+            _current.Volume = _volume;
+        }
     }
 
-    // Bilgisayarda kurulu ve etkin TTS seslerini döndürür
+    // İki altyapıda kurulu tüm sesler (önce SAPI, sonra Windows)
     public IReadOnlyList<VoiceOption> GetVoices()
     {
-        ThrowIfDisposed();
-        try
-        {
-            return _synthesizer.GetInstalledVoices()
-                .Where(v => v.Enabled)
-                .Select(v => new VoiceOption(v.VoiceInfo.Name, v.VoiceInfo.Culture.Name, GenderText(v.VoiceInfo.Gender)))
-                .ToList();
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException)
-        {
-            // Konuşma altyapısı bozuksa boş liste dönülür, arayüz uyarı gösterir
-            return Array.Empty<VoiceOption>();
-        }
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _sapi.GetVoices().Concat(_windows.GetVoices()).ToList();
     }
 
-    public void SelectVoice(string voiceName)
+    // Sese göre motor seçilir; motor değişirse süren okuma durdurulur
+    public void SelectVoice(VoiceOption voice)
     {
-        ThrowIfDisposed();
-        try
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ISpeechEngine target = voice.Engine == SpeechEngineKind.Sapi ? _sapi : _windows;
+        if (target != _current)
         {
-            _synthesizer.SelectVoice(voiceName);
+            _current.Stop();
+            _current = target;
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-        {
-            throw new ServiceException("Ses Seçilemedi", $"\"{voiceName}\" sesi kullanılamıyor. Başka bir ses seçin.", ex);
-        }
+
+        _current.SelectVoice(voice);
+        _current.Rate = _rate;
+        _current.Volume = _volume;
     }
 
-    // Metni eşzamansız (arayüzü kilitlemeden) okumaya başlar
-    public void Speak(string text)
+    public async Task SpeakAsync(string text)
     {
-        ThrowIfDisposed();
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (string.IsNullOrWhiteSpace(text))
             throw new ServiceException("Metin Yok", "Okunacak bir metin girin.");
 
-        if (IsBusy)
-            Stop();
-
-        try
-        {
-            _synthesizer.SetOutputToDefaultAudioDevice();
-            _synthesizer.SpeakAsync(text);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or COMException or System.ComponentModel.Win32Exception)
-        {
-            throw new ServiceException("Ses Aygıtı Hatası",
-                "Varsayılan ses çıkış aygıtına erişilemedi. Hoparlör veya kulaklığın bağlı ve etkin olduğundan emin olun.", ex);
-        }
+        _current.Rate = _rate;
+        _current.Volume = _volume;
+        await _current.SpeakAsync(text);
     }
 
-    public void Pause()
-    {
-        if (IsSpeaking)
-            _synthesizer.Pause();
-    }
+    public void Pause() => _current.Pause();
 
-    public void Resume()
-    {
-        if (IsPaused)
-            _synthesizer.Resume();
-    }
+    public void Resume() => _current.Resume();
 
-    // Okumayı tamamen durdurur ve kuyruğu temizler
     public void Stop()
     {
-        if (_disposed)
-            return;
-
-        // Duraklatılmış sentezleyici iptal edilmeden önce devam ettirilmeli
-        if (IsPaused)
-            _synthesizer.Resume();
-
-        _synthesizer.SpeakAsyncCancelAll();
+        if (!_disposed)
+            _current.Stop();
     }
 
-    private void Synthesizer_SpeakProgress(object? sender, SpeakProgressEventArgs e) =>
-        WordProgress?.Invoke(this, new WordProgressEventArgs(e.CharacterPosition, e.CharacterCount, e.Text));
-
-    private void Synthesizer_StateChanged(object? sender, System.Speech.Synthesis.StateChangedEventArgs e) =>
-        StateChanged?.Invoke(this, EventArgs.Empty);
-
-    private void Synthesizer_SpeakCompleted(object? sender, SpeakCompletedEventArgs e) =>
-        SpeakFinished?.Invoke(this, e.Error);
-
-    private static string GenderText(VoiceGender gender) => gender switch
+    // Yalnızca etkin motorun olayları dışarı aktarılır
+    private void Engine_WordProgress(object? sender, WordProgressEventArgs e)
     {
-        VoiceGender.Female => "Kadın",
-        VoiceGender.Male => "Erkek",
-        _ => "Belirsiz"
-    };
+        if (sender == _current)
+            WordProgress?.Invoke(this, e);
+    }
 
-    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+    private void Engine_StateChanged(object? sender, EventArgs e)
+    {
+        if (sender == _current)
+            StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void Engine_SpeakFinished(object? sender, Exception? error)
+    {
+        if (sender == _current)
+            SpeakFinished?.Invoke(this, error);
+    }
 
     public void Dispose()
     {
         if (_disposed)
             return;
 
-        // Olaylar ayrılır, okuma durdurulur ve sentezleyici kapatılır
-        _synthesizer.SpeakProgress -= Synthesizer_SpeakProgress;
-        _synthesizer.StateChanged -= Synthesizer_StateChanged;
-        _synthesizer.SpeakCompleted -= Synthesizer_SpeakCompleted;
-        try
-        {
-            Stop();
-        }
-        catch (InvalidOperationException)
-        {
-            // Kapanış sırasında durdurma hatası önemsizdir
-        }
-
+        // İki motor da durdurulup kapatılır
         _disposed = true;
-        _synthesizer.Dispose();
+        _sapi.Dispose();
+        _windows.Dispose();
     }
 }
