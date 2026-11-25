@@ -666,7 +666,7 @@ namespace SpeechApp
             this.cmbLanguage.Location = new System.Drawing.Point(88, 8);
             this.cmbLanguage.Margin = new System.Windows.Forms.Padding(0, 8, 20, 0);
             this.cmbLanguage.Name = "cmbLanguage";
-            this.cmbLanguage.Size = new System.Drawing.Size(280, 25);
+            this.cmbLanguage.Size = new System.Drawing.Size(350, 25);
             this.cmbLanguage.TabIndex = 1;
             //
             // btnListenStart
