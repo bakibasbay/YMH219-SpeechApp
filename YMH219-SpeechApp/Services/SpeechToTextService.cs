@@ -41,12 +41,41 @@ public sealed class SpeechToTextService : IDisposable
         }
     }
 
+    // Windows gizlilik ayarlarında mikrofon erişimi (genel veya masaüstü uygulamaları) kapalı mı?
+    private static bool IsMicrophoneAccessDenied()
+    {
+        const string key = @"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
+        try
+        {
+            using var general = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(key);
+            using var desktop = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(key + @"\NonPackaged");
+            return IsDeny(general) || IsDeny(desktop);
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            // Ayar okunamazsa kontrol atlanır; asıl hata dinleme sırasında bildirilir
+            return false;
+        }
+
+        static bool IsDeny(Microsoft.Win32.RegistryKey? k) =>
+            string.Equals(k?.GetValue("Value") as string, "Deny", StringComparison.OrdinalIgnoreCase);
+    }
+
     // Seçilen dilde mikrofonu dinlemeye başlar
     public void Start(CultureInfo culture)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (IsListening)
             return;
+
+        // İzin kapalıyken SAPI hata vermeden başlar ve sonradan kesilir; bu yüzden önceden kontrol edilir
+        if (IsMicrophoneAccessDenied())
+        {
+            throw new ServiceException("Mikrofon İzni Yok",
+                "Windows, masaüstü uygulamalarının mikrofona erişimini engelliyor.\n\n" +
+                "Ayarlar > Gizlilik ve güvenlik > Mikrofon bölümünde \"Mikrofon erişimi\" ve " +
+                "\"Masaüstü uygulamalarının mikrofonunuza erişmesine izin verin\" seçeneklerini açıp tekrar deneyin.");
+        }
 
         // Dil değiştiyse eski motor kapatılıp yenisi hazırlanır
         if (_engine is null || _engineCulture != culture.Name)
@@ -64,8 +93,8 @@ public sealed class SpeechToTextService : IDisposable
         {
             throw new ServiceException("Mikrofon Bulunamadı",
                 "Varsayılan bir kayıt aygıtı (mikrofon) bulunamadı.\n\n" +
-                "Mikrofonun bağlı olduğundan ve Windows Ayarlar > Gizlilik ve güvenlik > Mikrofon " +
-                "bölümünde masaüstü uygulamalarının mikrofona erişimine izin verildiğinden emin olun.", ex);
+                "Mikrofonun bağlı olduğundan ve Ayarlar > Sistem > Ses > Giriş bölümünde etkin " +
+                "(\"İzin ver\") olduğundan emin olun.", ex);
         }
 
         try
@@ -151,7 +180,7 @@ public sealed class SpeechToTextService : IDisposable
         if (e.Error is not null)
         {
             ErrorOccurred?.Invoke(this, new ServiceException("Dinleme Kesildi",
-                "Konuşma tanıma beklenmedik şekilde durdu. Mikrofon bağlantısını kontrol edin.\n\nAyrıntı: " + e.Error.Message, e.Error));
+                "Konuşma tanıma beklenmedik şekilde durdu. Mikrofonun bağlı ve mikrofon izninin açık olduğundan emin olun.\n\nAyrıntı:" + e.Error.Message, e.Error));
         }
 
         if (wasListening)

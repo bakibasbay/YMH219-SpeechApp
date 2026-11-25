@@ -382,9 +382,11 @@ public partial class MainForm : Form
 
     private void Stt_ErrorOccurred(object? sender, ServiceException ex) => RunOnUi(() =>
     {
-        ShowError(ex);
+        // Önce gösterge güncellenir ki uyarı açıkken "Dinleniyor" yazmasın
         SetStatusMessage("Dinleme hatayla durdu.");
+        lblHypothesis.Text = "Dinleme hatayla durdu.";
         UpdateUiState();
+        ShowError(ex);
     });
 
     private void UpdateResultCount() =>
